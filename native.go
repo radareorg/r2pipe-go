@@ -3,7 +3,7 @@
 package r2pipe
 
 import "github.com/rainycape/dl"
-import "log"
+import "errors"
 
 type Ptr = *struct{}
 
@@ -22,16 +22,16 @@ func NativeLoad() error {
 		return err
 	}
 	if lib.Sym("r_core_new", &r_core_new) != nil {
-		log.Fatal("r_core_new")
+		return errors.New("Missing r_core_new")
 	}
 	if lib.Sym("r_core_cmd_str", &r_core_cmd_str) != nil {
-		log.Fatal("r_core_new")
+		return errors.New("Missing r_core_cmd_str")
 	}
 	if lib.Sym("r_core_free", &r_core_free) != nil {
-		log.Fatal("r_core_free")
+		return errors.New("Missing r_core_free")
 	}
 	if lib.Sym("r_mem_free", &r_mem_free) != nil {
-		log.Fatal("r_mem_free")
+		return errors.New("Missing r_mem_free")
 	}
 	return nil
 }
@@ -49,7 +49,6 @@ func (r2p *Pipe) NativeClose() error {
 
 func NewNativePipe(file string) (*Pipe, error) {
 	if err := NativeLoad(); err != nil {
-		print("Cannot find libr\n")
 		return nil, err
 	}
 	r2 := r_core_new()
