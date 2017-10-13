@@ -55,7 +55,6 @@ type Pipe struct {
 	Core   *struct{}
 	cmd    CmdDelegate
 	close  CloseDelegate
-	// cmd func (*Pipe, string) (string,error)
 }
 
 type CmdDelegate func(*Pipe, string) (string, error)
