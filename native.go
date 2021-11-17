@@ -2,9 +2,13 @@
 
 package r2pipe
 
+//#include <dlfcn.h>
+// #include <stdlib.h>
+import "C"
+
 import (
-	"github.com/rainycape/dl"
 	"errors"
+	"unsafe"
 )
 
 type Ptr = *struct{}
@@ -17,24 +21,49 @@ var (
 	r_core_cmd_str func(Ptr, string) string
 )
 
+type DL struct {
+	handle unsafe.Pointer
+}
+func dlOpen(path string) (*DL, error){
+	var ret DL
+	cpath := C.CString(path)
+	if cpath == nil {
+		return nil, errors.New("Failed to get cpath")
+	}
+	//r2pioe only uses flag 0
+	ret.handle = C.dlopen(cpath, 0)
+	C.free(unsafe.Pointer(cpath))
+	if ret.handle == nil {
+		return nil, errors.New("Failed to open dl")
+	}
+	return &ret, nil
+}
+
+func (dl *DL) symFunc(name string, out interface{}) error {
+	cname := C.CString(name)
+	if cname ==>nil {
+		return
+	}
+}
+
 func NativeLoad() error {
 	if lib != nil {
 		return nil
 	}
-	lib, err := dl.Open("libr_core", 0)
+	lib, err := dlOpen("libr_core")
 	if err != nil {
 		return err
 	}
-	if lib.Sym("r_core_new", &r_core_new) != nil {
+	if lib.symFunc("r_core_new", &r_core_new) != nil {
 		return errors.New("Missing r_core_new")
 	}
-	if lib.Sym("r_core_cmd_str", &r_core_cmd_str) != nil {
+	if lib.symFunc("r_core_cmd_str", &r_core_cmd_str) != nil {
 		return errors.New("Missing r_core_cmd_str")
 	}
-	if lib.Sym("r_core_free", &r_core_free) != nil {
+	if lib.symFunc("r_core_free", &r_core_free) != nil {
 		return errors.New("Missing r_core_free")
 	}
-	if lib.Sym("r_mem_free", &r_mem_free) != nil {
+	if lib.symFunc("r_mem_free", &r_mem_free) != nil {
 		return errors.New("Missing r_mem_free")
 	}
 	return nil
