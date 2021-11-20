@@ -4,6 +4,23 @@ package r2pipe
 
 //#include <dlfcn.h>
 // #include <stdlib.h>
+// void *r_core_new(void *f) {
+// 	void *(*rcn)();
+// 	rcn = (void *(*)())f;
+// 	return rcn();
+// }
+//
+// void r_core_free(void *f, void *arg) {
+// 	void (*fr)(void *);
+// 	fr = (void (*)(void *))f;
+// 	fr(arg);
+// }
+//
+// char *r_core_cmd_str(void *f, void *arg, char *arg2) {
+// 	char *(*cmdstr)(void *, char *);
+// 	cmdstr = (char *(*)(void *, char *))f;
+// 	return cmdstr(arg, arg2);
+// }
 import "C"
 
 import (
@@ -17,14 +34,15 @@ var (
 	lib            Ptr = nil
 	r_core_new     func() Ptr
 	r_core_free    func(Ptr)
-	r_mem_free     func(interface{})
 	r_core_cmd_str func(Ptr, string) string
 )
 
 type DL struct {
 	handle unsafe.Pointer
+	name   string
 }
-func dlOpen(path string) (*DL, error){
+
+func dlOpen(path string) (*DL, error) {
 	var ret DL
 	cpath := C.CString(path)
 	if cpath == nil {
@@ -32,6 +50,7 @@ func dlOpen(path string) (*DL, error){
 	}
 	//r2pioe only uses flag 0
 	ret.handle = C.dlopen(cpath, 0)
+	ret.name = path
 	C.free(unsafe.Pointer(cpath))
 	if ret.handle == nil {
 		return nil, errors.New("Failed to open dl")
@@ -39,11 +58,17 @@ func dlOpen(path string) (*DL, error){
 	return &ret, nil
 }
 
-func (dl *DL) symFunc(name string, out interface{}) error {
+func dlSym(dl *DL, name string) (unsafe.Pointer, error) {
 	cname := C.CString(name)
-	if cname ==>nil {
-		return
+	if cname == nil {
+		return nil, errors.New("Fail")
 	}
+	handle := C.dlsym(dl.handle, cname)
+	C.free(unsafe.Pointer(cname))
+	if handle == nil {
+		return nil, errors.New("Fail")
+	}
+	return handle, nil
 }
 
 func NativeLoad() error {
@@ -51,20 +76,24 @@ func NativeLoad() error {
 		return nil
 	}
 	lib, err := dlOpen("libr_core")
+	_ = lib
 	if err != nil {
 		return err
 	}
-	if lib.symFunc("r_core_new", &r_core_new) != nil {
-		return errors.New("Missing r_core_new")
+	handle, _ := dlSym(lib, "r_core_new")
+	r_core_new = func() Ptr {
+		return Ptr(unsafe.Pointer(C.r_core_new(handle)))
 	}
-	if lib.symFunc("r_core_cmd_str", &r_core_cmd_str) != nil {
-		return errors.New("Missing r_core_cmd_str")
+	handle, _ = dlSym(lib, "r_core_free")
+	r_core_free = func(p Ptr) {
+		C.r_core_free(handle, unsafe.Pointer(p))
 	}
-	if lib.symFunc("r_core_free", &r_core_free) != nil {
-		return errors.New("Missing r_core_free")
-	}
-	if lib.symFunc("r_mem_free", &r_mem_free) != nil {
-		return errors.New("Missing r_mem_free")
+	handle, _ = dlSym(lib, "r_core_cmd_str")
+	r_core_cmd_str = func(p Ptr, s string) string {
+		a := C.CString(s)
+		b := C.r_core_cmd_str(handle, unsafe.Pointer(p), a)
+		C.free(unsafe.Pointer(a))
+		return C.GoString(b)
 	}
 	return nil
 }
