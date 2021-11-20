@@ -75,7 +75,7 @@ func NativeLoad() error {
 	if lib != nil {
 		return nil
 	}
-	lib, err := dlOpen("libr_core")
+	lib, err := dlOpen("libr_core.so")
 	_ = lib
 	if err != nil {
 		return err
