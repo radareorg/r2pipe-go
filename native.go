@@ -26,7 +26,6 @@ import "C"
 
 import (
 	"errors"
-	"os"
 	"runtime"
 	"unsafe"
 )
