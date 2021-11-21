@@ -6,9 +6,7 @@ package r2pipe
 // #cgo CFLAGS: -I/usr/local/include/libr/sdb
 // #cgo LDFLAGS: -L/usr/local/lib -lr_core
 // #include <stdio.h>
-// // include <dlfcn.h>
 // #include <stdlib.h>
-// // #include <r_core.h>
 // extern void r_core_free(void *);
 // extern void *r_core_new(void);
 // extern char *r_core_cmd_str(void*, const char *);

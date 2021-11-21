@@ -2,22 +2,23 @@
 
 package r2pipe
 
+//#cgo linux LDFLAGS: -ldl
 //#include <stdio.h>
 //#include <dlfcn.h>
 // #include <stdlib.h>
-// void *r_core_new(void *f) {
+// void *gor_core_new(void *f) {
 // 	void *(*rcn)();
 // 	rcn = (void *(*)())f;
 // 	return rcn();
 // }
 //
-// void r_core_free(void *f, void *arg) {
+// void gor_core_free(void *f, void *arg) {
 // 	void (*fr)(void *);
 // 	fr = (void (*)(void *))f;
 // 	fr(arg);
 // }
 //
-// char *r_core_cmd_str(void *f, void *arg, char *arg2) {
+// char *gor_core_cmd_str(void *f, void *arg, char *arg2) {
 // 	char *(*cmdstr)(void *, char *);
 // 	cmdstr = (char *(*)(void *, char *))f;
 // 	return cmdstr(arg, arg2);
@@ -25,12 +26,14 @@ package r2pipe
 import "C"
 
 import (
+	"fmt"
 	"errors"
 	"runtime"
 	"unsafe"
 )
 
-type Ptr = *struct{}
+type Ptr = unsafe.Pointer
+// *struct{}
 
 var (
 	lib            Ptr = nil
@@ -63,7 +66,7 @@ func dlOpen(path string) (*DL, error) {
 	ret.name = path
 	C.free(unsafe.Pointer(cpath))
 	if ret.handle == nil {
-		return nil, errors.New("Failed to open dl")
+		return nil, errors.New(fmt.Sprintf("Failed to open %s", path))
 	}
 	return &ret, nil
 }
@@ -92,17 +95,17 @@ func NativeLoad() error {
 	}
 	handle, _ := dlSym(lib, "r_core_new")
 	r_core_new = func() Ptr {
-		a := (Ptr)(C.r_core_new(handle))
+		a := (Ptr)(C.gor_core_new(handle))
 		return a
 	}
 	handle, _ = dlSym(lib, "r_core_free")
 	r_core_free = func(p Ptr) {
-		C.r_core_free(handle, unsafe.Pointer(p))
+		C.gor_core_free(handle, unsafe.Pointer(p))
 	}
 	handle, _ = dlSym(lib, "r_core_cmd_str")
 	r_core_cmd_str = func(p Ptr, s string) string {
 		a := C.CString(s)
-		b := C.r_core_cmd_str(handle, unsafe.Pointer(p), a)
+		b := C.gor_core_cmd_str(handle, unsafe.Pointer(p), a)
 		C.free(unsafe.Pointer(a))
 		return C.GoString(b)
 	}
