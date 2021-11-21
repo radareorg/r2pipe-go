@@ -34,6 +34,7 @@ package r2pipe
 
 import (
 	"bufio"
+	"unsafe"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -51,7 +52,7 @@ type Pipe struct {
 	r2cmd  *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
-	Core   *struct{}
+	Core   unsafe.Pointer
 	cmd    CmdDelegate
 	close  CloseDelegate
 }
