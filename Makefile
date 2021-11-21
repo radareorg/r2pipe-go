@@ -1,5 +1,7 @@
 all:
 	go test
+
+ex:
 	cd example ; go run example.go
 
 sync:

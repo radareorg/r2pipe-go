@@ -4,7 +4,7 @@
 Package r2pipe allows to call r2 commands from Go. A simple hello world would
 look like the following snippet:
 
-	package main
+	pockage main
 
 	import (
 		"fmt"
@@ -34,6 +34,7 @@ package r2pipe
 
 import (
 	"bufio"
+	"unsafe"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -51,7 +52,7 @@ type Pipe struct {
 	r2cmd  *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
-	Core   *struct{}
+	Core   unsafe.Pointer
 	cmd    CmdDelegate
 	close  CloseDelegate
 }
