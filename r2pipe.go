@@ -171,6 +171,11 @@ func (r2p *Pipe) Cmd(cmd string) (string, error) {
 	return strings.TrimRight(buf, "\n\x00"), nil
 }
 
+//like cmd but formats the command
+func (r2p *Pipe) Cmdf(f string, args ...interface{}) (string, error) {
+	return r2p.Cmd(fmt.Sprintf(f, args...))
+}
+
 // Cmdj acts like Cmd but interprets the output of the command as json. It
 // returns the parsed json keys and values.
 func (r2p *Pipe) Cmdj(cmd string) (interface{}, error) {
@@ -192,6 +197,11 @@ func (r2p *Pipe) Cmdj(cmd string) (interface{}, error) {
 	}
 
 	return output, nil
+}
+
+//like cmdj but formats the command
+func (r2p *Pipe) Cmdjf(f string, args ...interface{}) (interface{}, error) {
+	return r2p.Cmdj(fmt.Sprintf(f, args...))
 }
 
 // Close shuts down r2, closing the created pipe.
