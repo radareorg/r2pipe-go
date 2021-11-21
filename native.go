@@ -2,6 +2,7 @@
 
 package r2pipe
 
+//#include <stdio.h>
 //#include <dlfcn.h>
 // #include <stdlib.h>
 // void *r_core_new(void *f) {
@@ -25,6 +26,8 @@ import "C"
 
 import (
 	"errors"
+	"os"
+	"runtime"
 	"unsafe"
 )
 
@@ -44,6 +47,14 @@ type DL struct {
 
 func dlOpen(path string) (*DL, error) {
 	var ret DL
+	switch runtime.GOOS {
+	case "darwin":
+		path = path + ".dylib"
+	case "windows":
+		path = path + ".dll"
+	default:
+		path = path + ".so" //linux/bsds
+	}
 	cpath := C.CString(path)
 	if cpath == nil {
 		return nil, errors.New("Failed to get cpath")
@@ -75,14 +86,15 @@ func NativeLoad() error {
 	if lib != nil {
 		return nil
 	}
-	lib, err := dlOpen("libr_core.so")
+	lib, err := dlOpen("libr_core")
 	_ = lib
 	if err != nil {
 		return err
 	}
 	handle, _ := dlSym(lib, "r_core_new")
 	r_core_new = func() Ptr {
-		return Ptr(unsafe.Pointer(C.r_core_new(handle)))
+		a := (Ptr)(C.r_core_new(handle))
+		return a
 	}
 	handle, _ = dlSym(lib, "r_core_free")
 	r_core_free = func(p Ptr) {
