@@ -26,13 +26,14 @@ package r2pipe
 import "C"
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"runtime"
 	"unsafe"
 )
 
 type Ptr = unsafe.Pointer
+
 // *struct{}
 
 var (
@@ -93,19 +94,19 @@ func NativeLoad() error {
 	if err != nil {
 		return err
 	}
-	handle, _ := dlSym(lib, "r_core_new")
+	handle1, _ := dlSym(lib, "r_core_new")
 	r_core_new = func() Ptr {
-		a := (Ptr)(C.gor_core_new(handle))
+		a := (Ptr)(C.gor_core_new(handle1))
 		return a
 	}
-	handle, _ = dlSym(lib, "r_core_free")
+	handle2, _ := dlSym(lib, "r_core_free")
 	r_core_free = func(p Ptr) {
-		C.gor_core_free(handle, unsafe.Pointer(p))
+		C.gor_core_free(handle2, unsafe.Pointer(p))
 	}
-	handle, _ = dlSym(lib, "r_core_cmd_str")
+	handle3, _ := dlSym(lib, "r_core_cmd_str")
 	r_core_cmd_str = func(p Ptr, s string) string {
 		a := C.CString(s)
-		b := C.gor_core_cmd_str(handle, unsafe.Pointer(p), a)
+		b := C.gor_core_cmd_str(handle3, unsafe.Pointer(p), a)
 		C.free(unsafe.Pointer(a))
 		return C.GoString(b)
 	}
