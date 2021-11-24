@@ -34,7 +34,6 @@ package r2pipe
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -173,25 +172,12 @@ func (r2p *Pipe) Cmdf(f string, args ...interface{}) (string, error) {
 
 // Cmdj acts like Cmd but interprets the output of the command as json. It
 // returns the parsed json keys and values.
-func (r2p *Pipe) Cmdj(cmd string) (interface{}, error) {
-	if _, err := fmt.Fprintln(r2p, cmd); err != nil {
-		return nil, err
+func (r2p *Pipe) Cmdj(cmd string) (out interface{}, err error) {
+	rstr, err := r2p.Cmd(cmd)
+	if err == nil {
+		err = json.Unmarshal([]byte(rstr), out)
 	}
-
-	buf, err := bufio.NewReader(r2p).ReadBytes('\x00')
-	if err != nil {
-		return nil, err
-	}
-
-	buf = bytes.TrimRight(buf, "\n\x00")
-
-	var output interface{}
-
-	if err := json.Unmarshal(buf, &output); err != nil {
-		return nil, err
-	}
-
-	return output, nil
+	return out, err
 }
 
 //like cmdj but formats the command
