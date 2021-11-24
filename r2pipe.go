@@ -34,7 +34,6 @@ package r2pipe
 
 import (
 	"bufio"
-	"unsafe"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -43,6 +42,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"unsafe"
 )
 
 // A Pipe represents a communication interface with r2 that will be used to
@@ -52,6 +52,7 @@ type Pipe struct {
 	r2cmd  *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
+	stderr io.ReadCloser
 	Core   unsafe.Pointer
 	cmd    CmdDelegate
 	close  CloseDelegate
@@ -107,35 +108,21 @@ func newPipeFd() (*Pipe, error) {
 }
 
 func newPipeCmd(file string) (*Pipe, error) {
-	r2cmd := exec.Command("radare2", "-q0", file)
 
-	stdin, err := r2cmd.StdinPipe()
-	if err != nil {
-		return nil, err
+	r2p := &Pipe{File: file, r2cmd: exec.Command("radare2", "-q0", file)}
+	var err error
+	r2p.stdin, err = r2p.r2cmd.StdinPipe()
+	if err == nil {
+		r2p.stdout, err = r2p.r2cmd.StdoutPipe()
+		if err == nil {
+			r2p.stderr, err = r2p.r2cmd.StdoutPipe()
+		}
+		if err = r2p.r2cmd.Start(); err == nil {
+			//Read the initial data
+			_, err = bufio.NewReader(r2p.stdout).ReadString('\x00')
+		}
 	}
-
-	stdout, err := r2cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := r2cmd.Start(); err != nil {
-		return nil, err
-	}
-	// Read initial data
-	if _, err := bufio.NewReader(stdout).ReadString('\x00'); err != nil {
-		return nil, err
-	}
-
-	r2p := &Pipe{
-		File:   file,
-		r2cmd:  r2cmd,
-		stdin:  stdin,
-		stdout: stdout,
-		Core:   nil,
-	}
-
-	return r2p, nil
+	return r2p, err
 }
 
 // Write implements the standard Write interface: it writes data to the r2
@@ -145,9 +132,13 @@ func (r2p *Pipe) Write(p []byte) (n int, err error) {
 }
 
 // Read implements the standard Read interface: it reads data from the r2
-// pipe, blocking until the previously issued commands have finished.
+// pipe's stdin, blocking until the previously issued commands have finished.
 func (r2p *Pipe) Read(p []byte) (n int, err error) {
 	return r2p.stdout.Read(p)
+}
+
+func (r2p *Pipe) ReadErr(p []byte) (n int, err error) {
+	return r2p.stderr.Read(p)
 }
 
 // Cmd is a helper that allows to run r2 commands and receive their output.
@@ -168,8 +159,11 @@ func (r2p *Pipe) Cmd(cmd string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	return strings.TrimRight(buf, "\n\x00"), nil
+	errStr, err := bufio.NewReader(r2p.stderr).ReadString('\x00')
+	if err == nil && errStr != "" {
+		err = fmt.Errorf("r2 error: %s", errStr)
+	}
+	return strings.TrimRight(buf, "\n\x00"), err
 }
 
 //like cmd but formats the command
