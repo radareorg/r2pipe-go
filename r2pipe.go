@@ -34,6 +34,7 @@ package r2pipe
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,6 +61,7 @@ type Pipe struct {
 type (
 	CmdDelegate   func(*Pipe, string) (string, error)
 	CloseDelegate func(*Pipe) error
+	EventDelegate func(*Pipe, string, interface{}, string) bool
 )
 
 // NewPipe returns a new r2 pipe and initializes an r2 core that will try to
@@ -138,6 +140,31 @@ func (r2p *Pipe) Read(p []byte) (n int, err error) {
 
 func (r2p *Pipe) ReadErr(p []byte) (n int, err error) {
 	return r2p.stderr.Read(p)
+}
+
+func (r2p *Pipe) On(evname string, p interface{}, cb EventDelegate) error {
+	path, err := r2p.Cmd("===stderr")
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_RDONLY, 0600)
+
+	if err != nil {
+		return err
+	}
+	go func() {
+		var buf bytes.Buffer
+		for {
+			io.Copy(&buf, f)
+			if buf.Len() > 0 {
+				if !cb(r2p, evname, p, buf.String()) {
+					break
+				}
+			}
+		}
+		f.Close()
+	}()
+	return nil
 }
 
 // Cmd is a helper that allows to run r2 commands and receive their output.
