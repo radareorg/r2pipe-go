@@ -17,7 +17,6 @@ import (
 	"unsafe"
 )
 
-
 func (r2p *Pipe) ApiCmd(cmd string) (string, error) {
 	res := C.r_core_cmd_str(r2p.Core, C.CString(cmd))
 	return C.GoString(res), nil
