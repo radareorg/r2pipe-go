@@ -28,6 +28,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"unsafe"
 )
@@ -48,6 +49,19 @@ type DL struct {
 	name   string
 }
 
+func libpath(libname string) string {
+	paths := []string{"/usr/local/lib", "/usr/lib", "/lib"}
+	for _, path := range paths {
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			// path/to/whatever does not exist
+		} else {
+			// file exists
+			return path + "/" + libname
+		}
+	}
+	return libname
+}
+
 func dlOpen(path string) (*DL, error) {
 	var ret DL
 	switch runtime.GOOS {
@@ -58,6 +72,7 @@ func dlOpen(path string) (*DL, error) {
 	default:
 		path = path + ".so" //linux/bsds
 	}
+	path = libpath(path)
 	cpath := C.CString(path)
 	if cpath == nil {
 		return nil, errors.New("Failed to get cpath")
