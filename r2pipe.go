@@ -158,10 +158,6 @@ func (r2p *Pipe) Cmd(cmd string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	errStr, err := bufio.NewReader(r2p.stderr).ReadString('\x00')
-	if err == nil && errStr != "" {
-		err = fmt.Errorf("r2 error: %s", errStr)
-	}
 	return strings.TrimRight(buf, "\n\x00"), err
 }
 
