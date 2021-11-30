@@ -1,3 +1,4 @@
+//+build api
 // radare - LGPL - Copyright 2021 - pancake
 
 package r2pipe
