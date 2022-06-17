@@ -73,14 +73,15 @@ func dlOpen(path string) (*DL, error) {
 }
 
 func dlSym(dl *DL, name string) (unsafe.Pointer, error) {
+	err := fmt.Errorf("Failed to load '%s' from '%s'", name, dl.name)
 	cname := C.CString(name)
 	if cname == nil {
-		return nil, errors.New("Fail")
+		return nil, errors.New(err)
 	}
 	handle := C.dlsym(dl.handle, cname)
 	C.free(unsafe.Pointer(cname))
 	if handle == nil {
-		return nil, errors.New("Fail")
+		return nil, errors.New(err)
 	}
 	return handle, nil
 }
