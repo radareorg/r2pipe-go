@@ -4,6 +4,7 @@ package r2pipe
 
 // #cgo CFLAGS: -I/usr/local/include/libr
 // #cgo CFLAGS: -I/usr/local/include/libr/sdb
+// #cgo LDFLAGS: -L/usr/local/lib -lr_core
 // #cgo pkg-config: r_core
 // #include <stdio.h>
 // #include <stdlib.h>
