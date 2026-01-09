@@ -20,6 +20,9 @@ import (
 
 func (r2p *Pipe) ApiCmd(cmd string) (string, error) {
 	res := C.r_core_cmd_str(r2p.Core, C.CString(cmd))
+		if res == nil {
+		return "", nil
+	}
 	return C.GoString(res), nil
 }
 
