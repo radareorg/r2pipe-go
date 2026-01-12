@@ -22,7 +22,7 @@ jobs:
       run: git clone --depth=1 https://github.com/radareorg/radare2 && radare2/sys/install.sh > /dev/null
 
     - name: Build
-      run: go build -v ./...
+      run: go build -v .
 
     - name: Test
-      run: go test -v ./...
+      run: go test -v .

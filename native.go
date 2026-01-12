@@ -37,7 +37,7 @@ type Ptr = unsafe.Pointer
 // *struct{}
 
 var (
-	lib            Ptr = nil
+	lib            *DL = nil
 	r_core_new     func() Ptr
 	r_core_free    func(Ptr)
 	r_core_cmd_str func(Ptr, string) string
@@ -50,26 +50,37 @@ type DL struct {
 
 func dlOpen(path string) (*DL, error) {
 	var ret DL
+	var ext string
 	switch runtime.GOOS {
 	case "darwin":
-		path = path + ".dylib"
+		ext = ".dylib"
 	case "windows":
-		path = path + ".dll"
+		ext = ".dll"
 	default:
-		path = path + ".so" //linux/bsds
+		ext = ".so" //linux/bsds
 	}
-	cpath := C.CString(path)
-	if cpath == nil {
-		return nil, errors.New("Failed to get cpath")
+	
+	// Try multiple paths: just the name, /usr/lib, /usr/local/lib
+	paths := []string{
+		path + ext,
+		"/usr/lib/" + path + ext,
+		"/usr/local/lib/" + path + ext,
 	}
-	//r2pioe only uses flag 0
-	ret.handle = C.dlopen(cpath, 0)
-	ret.name = path
-	C.free(unsafe.Pointer(cpath))
-	if ret.handle == nil {
-		return nil, errors.New(fmt.Sprintf("Failed to open %s", path))
+	
+	for _, p := range paths {
+		cpath := C.CString(p)
+		if cpath == nil {
+			continue
+		}
+		ret.handle = C.dlopen(cpath, 0)
+		ret.name = p
+		C.free(unsafe.Pointer(cpath))
+		if ret.handle != nil {
+			return &ret, nil
+		}
 	}
-	return &ret, nil
+	
+	return nil, errors.New(fmt.Sprintf("Failed to open %s in standard paths", path))
 }
 
 func dlSym(dl *DL, name string) (unsafe.Pointer, error) {
@@ -90,8 +101,8 @@ func NativeLoad() error {
 	if lib != nil {
 		return nil
 	}
-	lib, err := dlOpen("libr_core")
-	_ = lib
+	var err error
+	lib, err = dlOpen("libr_core")
 	if err != nil {
 		return err
 	}

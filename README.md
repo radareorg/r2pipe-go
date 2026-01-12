@@ -1,6 +1,8 @@
 r2pipe.go
 =========
 
+[![Build Status](https://github.com/radareorg/r2pipe-go/workflows/Go/badge.svg)](https://github.com/radareorg/r2pipe-go/actions)
+
 Go module to interact with radare2
 
 Source
