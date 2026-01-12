@@ -1,5 +1,8 @@
 name: "CodeQL"
 
+env:
+  R2V: 6.0.8
+
 on:
   push:
     branches: [ "master" ]
@@ -25,6 +28,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Set up radare2
+        run: |
+          wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2_${{env.R2V}}_amd64.deb
+          wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-dev_${{env.R2V}}_amd64.deb
+          sudo dpkg -i radare2_${{env.R2V}}_amd64.deb
+          sudo dpkg -i radare2-dev_${{env.R2V}}_amd64.deb
+
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
