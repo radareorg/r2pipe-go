@@ -59,11 +59,22 @@ func dlOpen(path string) (*DL, error) {
 		ext = ".so" //linux/bsds
 	}
 	
-	// Try multiple paths: just the name, /usr/lib, /usr/local/lib
 	paths := []string{
 		path + ext,
 		"/usr/lib/" + path + ext,
 		"/usr/local/lib/" + path + ext,
+		"/opt/homebrew/lib/" + path + ext, // Apple Silicon Homebrew
+	}
+
+	// Add Linux multiarch paths if running on Linux
+	if runtime.GOOS == "linux" {
+		linuxPaths := []string{
+			"/usr/lib/x86_64-linux-gnu/" + path + ext, // Ubuntu/Debian 64-bit
+			"/usr/lib/i386-linux-gnu/" + path + ext,    // Ubuntu/Debian 32-bit
+			"/usr/lib64/" + path + ext,                  // Generic 64-bit path
+			"/usr/lib32/" + path + ext,                  // Generic 32-bit path
+		}
+		paths = append(paths, linuxPaths...)
 	}
 	
 	for _, p := range paths {
