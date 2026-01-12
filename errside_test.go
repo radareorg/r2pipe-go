@@ -9,20 +9,20 @@ func TestErrSide(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r2p.Close()
+	_ = r2p.Close()
 	var res = false
-	r2p.On("errmsg", res, func(p *Pipe, typ string, user interface{}, dat string) bool {
+	_ = r2p.On("errmsg", res, func(p *Pipe, typ string, user interface{}, dat string) bool {
 		fmt.Println("errmsg received")
 		res = true
 		return false
 		// return true
 	})
 
-	r2p.Cmd("aaa")
-	time.Sleep(1)
+	_, _ = r2p.Cmd("aaa")
+	time.Sleep(100 * time.Millisecond)
 	if res {
 		fmt.Println("It works!")
 	}
-	defer r2p.Close()
+	defer func() { _ = r2p.Close() }()
 	fmt.Println("[*] Testing r2pipe-side stderr message")
 }

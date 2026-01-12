@@ -45,7 +45,7 @@ func NewApiPipe(file string) (*Pipe, error) {
 		},
 	}
 	if file != "" {
-		r2p.ApiCmd("o " + file)
+		_, _ = r2p.ApiCmd("o " + file)
 	}
 	return r2p, nil
 }

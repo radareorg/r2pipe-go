@@ -1,3 +1,3 @@
 module github.com/radareorg/r2pipe-go
 
-go 1.14
+go 1.24

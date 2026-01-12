@@ -26,7 +26,6 @@ package r2pipe
 import "C"
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 	"unsafe"
@@ -80,11 +79,11 @@ func dlOpen(path string) (*DL, error) {
 		}
 	}
 	
-	return nil, errors.New(fmt.Sprintf("Failed to open %s in standard paths", path))
+	return nil, fmt.Errorf("failed to open %s in standard paths", path)
 }
 
 func dlSym(dl *DL, name string) (unsafe.Pointer, error) {
-	err := fmt.Errorf("Failed to load '%s' from '%s'", name, dl.name)
+	err := fmt.Errorf("failed to load '%s' from '%s'", name, dl.name)
 	cname := C.CString(name)
 	if cname == nil {
 		return nil, err
@@ -152,7 +151,7 @@ func NewNativePipe(file string) (*Pipe, error) {
 		},
 	}
 	if file != "" {
-		r2p.NativeCmd("o " + file)
+		_, _ = r2p.NativeCmd("o " + file)
 	}
 	return r2p, nil
 }

@@ -18,7 +18,7 @@ func TestCmd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r2p.Close()
+	defer func() { _ = r2p.Close() }()
 
 	check := "Hello World"
 
@@ -35,13 +35,13 @@ func TestCmd(t *testing.T) {
 	}
 
 	offset := Offset{}
-	r2p.CmdjStruct("sj ~{0}", &offset)
+	_ = r2p.CmdjStruct("sj ~{0}", &offset)
 
 	if !offset.Current {
 		t.Errorf("CurrentOffset=%v; want=%v", offset.Current, true)
 	}
 
-	r2p.CmdjfStruct("sj ~{%d}", &offset, 0)
+	_ = r2p.CmdjfStruct("sj ~{%d}", &offset, 0)
 	if !offset.Current {
 		t.Errorf("CurrentOffset=%v; want=%v", offset.Current, true)
 	}

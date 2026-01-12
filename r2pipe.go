@@ -116,7 +116,7 @@ func newPipeCmd(file string) (*Pipe, error) {
 	if err == nil {
 		r2p.stdout, err = r2p.r2cmd.StdoutPipe()
 		if err == nil {
-			r2p.stderr, err = r2p.r2cmd.StdoutPipe()
+			r2p.stderr, _ = r2p.r2cmd.StderrPipe()
 		}
 		if err = r2p.r2cmd.Start(); err == nil {
 			//Read the initial data
@@ -155,14 +155,14 @@ func (r2p *Pipe) On(evname string, p interface{}, cb EventDelegate) error {
 	go func() {
 		var buf bytes.Buffer
 		for {
-			io.Copy(&buf, f)
+			_, _ = io.Copy(&buf, f)
 			if buf.Len() > 0 {
 				if !cb(r2p, evname, p, buf.String()) {
 					break
 				}
 			}
 		}
-		f.Close()
+		_ = f.Close()
 	}()
 	return nil
 }
