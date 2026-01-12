@@ -3,9 +3,16 @@
 package r2pipe
 
 //#cgo linux LDFLAGS: -ldl
+//#cgo darwin LDFLAGS: -ldl
 //#include <stdio.h>
 //#include <dlfcn.h>
 // #include <stdlib.h>
+// #ifndef RTLD_NOW
+// #define RTLD_NOW 0x2
+// #endif
+// #ifndef RTLD_GLOBAL
+// #define RTLD_GLOBAL 0x100
+// #endif
 // void *gor_core_new(void *f) {
 // 	void *(*rcn)();
 // 	rcn = (void *(*)())f;
@@ -58,7 +65,7 @@ func dlOpen(path string) (*DL, error) {
 	default:
 		ext = ".so" //linux/bsds
 	}
-	
+
 	paths := []string{
 		path + ext,
 		"/usr/lib/" + path + ext,
@@ -76,20 +83,21 @@ func dlOpen(path string) (*DL, error) {
 		}
 		paths = append(paths, linuxPaths...)
 	}
-	
+
 	for _, p := range paths {
 		cpath := C.CString(p)
 		if cpath == nil {
 			continue
 		}
-		ret.handle = C.dlopen(cpath, 0)
+		// Use RTLD_NOW|RTLD_GLOBAL to properly load library and its dependencies
+		ret.handle = C.dlopen(cpath, C.RTLD_NOW|C.RTLD_GLOBAL)
 		ret.name = p
 		C.free(unsafe.Pointer(cpath))
 		if ret.handle != nil {
 			return &ret, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("failed to open %s in standard paths", path)
 }
 
