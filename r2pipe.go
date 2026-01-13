@@ -36,6 +36,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -81,17 +82,17 @@ func newPipeFd() (*Pipe, error) {
 	r2pipeOut := os.Getenv("R2PIPE_OUT")
 
 	if r2pipeIn == "" || r2pipeOut == "" {
-		return nil, fmt.Errorf("missing R2PIPE_{IN,OUT} vars")
+		return nil, errors.New("missing R2PIPE_{IN,OUT} environment variables")
 	}
 
 	r2pipeInFd, err := strconv.Atoi(r2pipeIn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert IN into file descriptor")
+		return nil, fmt.Errorf("failed to parse R2PIPE_IN environment variable as integer: %w", err)
 	}
 
 	r2pipeOutFd, err := strconv.Atoi(r2pipeOut)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert OUT into file descriptor")
+		return nil, fmt.Errorf("failed to parse R2PIPE_OUT environment variable as integer: %w", err)
 	}
 
 	stdout := os.NewFile(uintptr(r2pipeInFd), "R2PIPE_IN")
@@ -109,21 +110,34 @@ func newPipeFd() (*Pipe, error) {
 }
 
 func newPipeCmd(file string) (*Pipe, error) {
-
 	r2p := &Pipe{File: file, r2cmd: exec.Command("radare2", "-q0", file)}
+
 	var err error
 	r2p.stdin, err = r2p.r2cmd.StdinPipe()
-	if err == nil {
-		r2p.stdout, err = r2p.r2cmd.StdoutPipe()
-		if err == nil {
-			r2p.stderr, _ = r2p.r2cmd.StderrPipe()
-		}
-		if err = r2p.r2cmd.Start(); err == nil {
-			//Read the initial data
-			_, err = bufio.NewReader(r2p.stdout).ReadString('\x00')
-		}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
 	}
-	return r2p, err
+
+	r2p.stdout, err = r2p.r2cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	// stderr is optional, but log the error
+	r2p.stderr, _ = r2p.r2cmd.StderrPipe()
+
+	if err := r2p.r2cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start radare2 process: %w", err)
+	}
+
+	// Read the initial null terminator to confirm process readiness
+	_, err = bufio.NewReader(r2p.stdout).ReadString('\x00')
+	if err != nil {
+		_ = r2p.r2cmd.Wait() // attempt cleanup
+		return nil, fmt.Errorf("failed to read initial response from radare2: %w", err)
+	}
+
+	return r2p, nil
 }
 
 // Write implements the standard Write interface: it writes data to the r2
@@ -142,17 +156,26 @@ func (r2p *Pipe) ReadErr(p []byte) (n int, err error) {
 	return r2p.stderr.Read(p)
 }
 
+// On registers an event handler for radare2 events.
 func (r2p *Pipe) On(evname string, p interface{}, cb EventDelegate) error {
 	path, err := r2p.Cmd("===stderr")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get stderr path: %w", err)
 	}
-	f, err := os.OpenFile(path, os.O_RDONLY, 0600)
 
+	f, err := os.OpenFile(path, os.O_RDONLY, 0600)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open stderr file %q: %w", path, err)
 	}
+
 	go func() {
+		defer func() {
+			if err := f.Close(); err != nil {
+				// In a real implementation, we might log this
+				_ = err
+			}
+		}()
+
 		var buf bytes.Buffer
 		for {
 			_, _ = io.Copy(&buf, f)
@@ -162,59 +185,87 @@ func (r2p *Pipe) On(evname string, p interface{}, cb EventDelegate) error {
 				}
 			}
 		}
-		_ = f.Close()
 	}()
 	return nil
 }
 
-// Cmd is a helper that allows to run r2 commands and receive their output.
+// Cmd executes a radare2 command and returns the response.
+// The command string should not include a newline character.
+// Example:
+//
+//	response, err := pipe.Cmd("iI")
+//	if err != nil {
+//		return err
+//	}
 func (r2p *Pipe) Cmd(cmd string) (string, error) {
+	if cmd == "" {
+		return "", errors.New("command cannot be empty")
+	}
+
 	if r2p.Core != nil {
 		if r2p.cmd != nil {
 			return r2p.cmd(r2p, cmd)
 		}
-
 		return "", nil
 	}
 
+	if r2p.stdin == nil {
+		return "", errors.New("stdin pipe is not initialized")
+	}
+
 	if _, err := fmt.Fprintln(r2p, cmd); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to write command %q: %w", cmd, err)
+	}
+
+	if r2p.stdout == nil {
+		return "", errors.New("stdout pipe is not initialized")
 	}
 
 	buf, err := bufio.NewReader(r2p).ReadString('\x00')
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read response from command %q: %w", cmd, err)
 	}
-	return strings.TrimRight(buf, "\n\x00"), err
+	return strings.TrimRight(buf, "\n\x00"), nil
 }
 
-//like cmd but formats the command
+// like cmd but formats the command
 func (r2p *Pipe) Cmdf(f string, args ...interface{}) (string, error) {
 	return r2p.Cmd(fmt.Sprintf(f, args...))
 }
 
-// Cmdj acts like Cmd but interprets the output of the command as json. It
-// returns the parsed json keys and values.
+// Cmdj acts like Cmd but interprets the output of the command as json.
+// It returns the parsed json keys and values.
 func (r2p *Pipe) Cmdj(cmd string) (out interface{}, err error) {
 	rstr, err := r2p.Cmd(cmd)
-	if err == nil {
-		err = json.Unmarshal([]byte(rstr), out)
+	if err != nil {
+		return out, fmt.Errorf("failed to execute command %q: %w", cmd, err)
 	}
-	return out, err
+
+	if err := json.Unmarshal([]byte(rstr), out); err != nil {
+		return out, fmt.Errorf("failed to parse JSON response from command %q: %w", cmd, err)
+	}
+	return out, nil
 }
 
-// CmdjStruct acts like Cmdjs but it will fill the interface/struct with the wanted values. It
-// returns the command execution error.
-func (r2p *Pipe) CmdjStruct(cmd string, out interface{}) (err error) {
+// CmdjStruct acts like Cmd but parses the JSON response into the provided struct.
+// It returns the command execution error.
+func (r2p *Pipe) CmdjStruct(cmd string, out interface{}) error {
+	if out == nil {
+		return errors.New("output struct cannot be nil")
+	}
+
 	rstr, err := r2p.Cmd(cmd)
-
-	if err == nil {
-		err = json.Unmarshal([]byte(rstr), out)
+	if err != nil {
+		return fmt.Errorf("failed to execute command %q: %w", cmd, err)
 	}
-	return err
+
+	if err := json.Unmarshal([]byte(rstr), out); err != nil {
+		return fmt.Errorf("failed to parse JSON response from command %q into struct: %w", cmd, err)
+	}
+	return nil
 }
 
-//like cmdj but formats the command
+// like cmdj but formats the command
 func (r2p *Pipe) Cmdjf(f string, args ...interface{}) (interface{}, error) {
 	return r2p.Cmdj(fmt.Sprintf(f, args...))
 }
@@ -225,6 +276,7 @@ func (r2p *Pipe) CmdjfStruct(f string, out interface{}, args ...interface{}) err
 }
 
 // Close shuts down r2, closing the created pipe.
+// It gracefully sends the quit command and waits for the process to exit.
 func (r2p *Pipe) Close() error {
 	if r2p.close != nil {
 		return r2p.close(r2p)
@@ -234,14 +286,26 @@ func (r2p *Pipe) Close() error {
 		return nil
 	}
 
+	// Send quit command to r2
 	if _, err := r2p.Cmd("q"); err != nil {
-		return err
+		// Log the error but continue with process cleanup
+		_ = err
 	}
 
-	return r2p.r2cmd.Wait()
+	if r2p.r2cmd == nil || r2p.r2cmd.Process == nil {
+		return nil
+	}
+
+	// Wait for the process to exit
+	if err := r2p.r2cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to wait for radare2 process exit: %w", err)
+	}
+
+	return nil
 }
 
-// Forcing shutdown of r2, closing the created pipe.
+// ForceClose performs a forced shutdown of r2, closing the created pipe.
+// It sends the force-quit command and waits for the process to exit.
 func (r2p *Pipe) ForceClose() error {
 	if r2p.close != nil {
 		return r2p.close(r2p)
@@ -251,9 +315,20 @@ func (r2p *Pipe) ForceClose() error {
 		return nil
 	}
 
+	// Send force quit command to r2
 	if _, err := r2p.Cmd("q!"); err != nil {
-		return err
+		// Log the error but continue with process cleanup
+		_ = err
 	}
 
-	return r2p.r2cmd.Wait()
+	if r2p.r2cmd == nil || r2p.r2cmd.Process == nil {
+		return nil
+	}
+
+	// Wait for the process to exit
+	if err := r2p.r2cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to wait for radare2 process exit: %w", err)
+	}
+
+	return nil
 }

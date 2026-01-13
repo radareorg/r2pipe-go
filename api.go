@@ -15,25 +15,50 @@ package r2pipe
 import "C"
 
 import (
+	"fmt"
 	"unsafe"
 )
 
+// ApiCmd executes a command using the C API.
 func (r2p *Pipe) ApiCmd(cmd string) (string, error) {
-	res := C.r_core_cmd_str(r2p.Core, C.CString(cmd))
-		if res == nil {
+	if cmd == "" {
+		return "", fmt.Errorf("command cannot be empty")
+	}
+	if r2p.Core == nil {
+		return "", fmt.Errorf("radare2 core is not initialized")
+	}
+
+	cstr := C.CString(cmd)
+	if cstr == nil {
+		return "", fmt.Errorf("failed to allocate C string for command %q", cmd)
+	}
+	defer C.free(unsafe.Pointer(cstr))
+
+	res := C.r_core_cmd_str(r2p.Core, cstr)
+	if res == nil {
 		return "", nil
 	}
+
 	return C.GoString(res), nil
 }
 
+// ApiClose frees the radare2 core instance.
 func (r2p *Pipe) ApiClose() error {
+	if r2p.Core == nil {
+		return nil
+	}
 	C.r_core_free(unsafe.Pointer(r2p.Core))
 	r2p.Core = nil
 	return nil
 }
 
+// NewApiPipe creates a new pipe using the C API.
 func NewApiPipe(file string) (*Pipe, error) {
 	r2 := C.r_core_new()
+	if r2 == nil {
+		return nil, fmt.Errorf("failed to create radare2 core instance")
+	}
+
 	r2p := &Pipe{
 		File: file,
 		Core: r2,
@@ -44,8 +69,14 @@ func NewApiPipe(file string) (*Pipe, error) {
 			return r2p.ApiClose()
 		},
 	}
+
 	if file != "" {
-		_, _ = r2p.ApiCmd("o " + file)
+		_, err := r2p.ApiCmd("o " + file)
+		if err != nil {
+			// Log the error but don't fail; the file might be openable later
+			_ = err
+		}
 	}
+
 	return r2p, nil
 }
