@@ -1,0 +1,60 @@
+name: Release
+
+env:
+  R2V: 6.0.8
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+    branches:
+      - master
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: "1.24"
+
+    - name: Set up radare2
+      run: |
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2_${{env.R2V}}_amd64.deb
+        wget https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-dev_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2_${{env.R2V}}_amd64.deb
+        sudo dpkg -i radare2-dev_${{env.R2V}}_amd64.deb
+
+    - name: Build
+      run: go build -v .
+
+    - name: Test
+      run: go test -v .
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v9
+      with:
+        version: latest
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          Release ${{ github.ref }}
+          
+          Changes in this release:
+          - Updated to version 0.3.0
+          - Improved error handling
+          - Enhanced native library loading
+        draft: false
+        prerelease: false
