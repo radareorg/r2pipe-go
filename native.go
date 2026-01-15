@@ -1,3 +1,5 @@
+// +build !windows
+
 // radare - LGPL - Copyright 2017 - pancake
 
 package r2pipe

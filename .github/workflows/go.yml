@@ -109,3 +109,24 @@ jobs:
 
     - name: go vet
       run: go vet ./...
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: "1.24"
+
+    - name: install r2 (preconfigure)
+      shell: bash
+      run: |
+        curl -L -o r2.zip https://github.com/radareorg/radare2/releases/download/${{env.R2V}}/radare2-${{env.R2V}}-w64.zip
+        7z x r2.zip
+        mv radare2-${{env.R2V}}-w64 radare2
+        echo "%CD%\radare2\bin" >> $GITHUB_PATH
+
+    - name: Build
+      run: go build -v .
