@@ -52,8 +52,9 @@ func newPipeCmd(file string) (*Pipe, error) {
 	}
 
 	// Create os.File from the handle for stdin/stdout
-	r2p.stdin = os.NewFile(uintptr(pipeHandle), "R2PIPE_IN")
-	r2p.stdout = r2p.stdin // same handle for duplex
+	pipeFile := os.NewFile(uintptr(pipeHandle), "R2PIPE")
+	r2p.stdin = pipeFile
+	r2p.stdout = pipeFile // same handle for duplex
 
 	return r2p, nil
 }
